@@ -5,8 +5,8 @@ require_relative "lib/strict_lazy/version"
 Gem::Specification.new do |spec|
   spec.name = "strict_lazy"
   spec.version = StrictLazy::VERSION
-  spec.authors = ["aki"]
-  spec.email = ["lala.akira@gmail.com"]
+  spec.authors = ["aki77"]
+  spec.email = ["aki77@users.noreply.github.com"]
 
   spec.summary = "Strict, explicit preloading for computed values — raise on unloaded access instead of silent N+1."
   spec.description = <<~DESC
