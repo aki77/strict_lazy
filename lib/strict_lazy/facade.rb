@@ -36,7 +36,8 @@ module StrictLazy
       @record.class.lazy_loaders
     end
 
-    # No preceding preload reached this record.
+    # No preceding preload reached this record. Consult the effective policy
+    # (a with_violation override, else the global baseline).
     def unloaded(loader)
       case StrictLazy.violation
       when :raise

@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-14
+
+### Added
+
+- `StrictLazy.with_violation(mode) { ... }` — scope the violation policy to a
+  block, restoring the previous state afterward (exception-safe). Overrides
+  nest and are isolated per Fiber/Thread, so parallel test processes never
+  interfere. Useful for relaxing the policy per test type, e.g. `:ignore` in
+  model specs while keeping `:raise` in system specs.
+- `StrictLazy.violation=` and `with_violation` now raise `ArgumentError` for
+  modes other than `:raise` / `:log` / `:ignore`.
+
+### Changed
+
+- `StrictLazy.violation` is now a reader that returns the **effective** policy
+  for the current execution context (the innermost `with_violation` override,
+  else the global baseline). The global baseline moved to
+  `StrictLazy.default_violation`; `StrictLazy.violation=` still sets it, so the
+  public API and the Railtie are unchanged.
+
 ## [0.2.0] - 2026-06-14
 
 ### Added
@@ -28,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   defaulting to `:raise` in development/test and `:ignore` in production through a Railtie.
 - Per-record callable `default:` for unfulfilled records.
 
-[Unreleased]: https://github.com/aki77/strict_lazy/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/aki77/strict_lazy/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/aki77/strict_lazy/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aki77/strict_lazy/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aki77/strict_lazy/releases/tag/v0.1.0

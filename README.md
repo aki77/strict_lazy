@@ -97,6 +97,52 @@ Environment defaults (via the Railtie):
 Override globally with `StrictLazy.violation = :log`, or in Rails with
 `config.strict_lazy.violation = :log`.
 
+### Scoped overrides — `with_violation`
+
+`StrictLazy.with_violation(mode) { ... }` overrides the effective policy for the
+duration of the block, then restores the previous state — even if the block
+raises. Overrides nest (an inner call shadows the outer one) and are scoped to
+the current Fiber/Thread, so parallel test processes never interfere.
+
+```ruby
+StrictLazy.with_violation(:ignore) do
+  record.lazy.x  # degrades to a single-record resolve instead of raising
+end
+```
+
+The three APIs relate as: `StrictLazy.violation=` sets the global **baseline**,
+`with_violation` applies a **scoped** override, and the `StrictLazy.violation`
+reader returns the **effective** value (innermost override, else the baseline).
+
+### Per-test policy in RSpec
+
+`strict_lazy` ships no implicit RSpec hook — wire it up explicitly so the policy
+is visible where it applies. A common setup: model specs don't need preloads
+(`:ignore`), while system/request specs keep the strict baseline (`:raise`).
+
+```ruby
+# spec/rails_helper.rb
+RSpec.configure do |config|
+  config.around(:each, type: :model) do |example|
+    StrictLazy.with_violation(:ignore) { example.run }
+  end
+end
+```
+
+To relax only a few examples, drive the `around` off a tag instead:
+
+```ruby
+RSpec.configure do |config|
+  config.around(:each, :ignore_lazy) do |example|
+    StrictLazy.with_violation(:ignore) { example.run }
+  end
+end
+
+it "computes something", :ignore_lazy do
+  # ...
+end
+```
+
 ## Defaults
 
 `default:` is written for any record the resolver does not fulfill. Pass a

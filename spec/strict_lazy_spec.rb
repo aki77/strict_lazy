@@ -168,6 +168,66 @@ RSpec.describe StrictLazy do
       StrictLazy.violation = :log
       expect(post.lazy.comments_count).to eq(0)
     end
+
+    it "raises ArgumentError for an invalid mode" do
+      expect { StrictLazy.violation = :bogus }.to raise_error(ArgumentError, /must be one of/)
+    end
+  end
+
+  describe ".with_violation" do
+    let(:post) { make_posts(1).first }
+
+    # The spec_helper resets the baseline to :raise before each example.
+    it "overrides the effective policy inside the block, then restores it" do
+      Comment.create!(post: post, body: "c")
+
+      value = nil
+      StrictLazy.with_violation(:ignore) do
+        expect(StrictLazy.violation).to eq(:ignore)
+        value = post.lazy.comments_count # would raise under :raise
+      end
+
+      expect(value).to eq(1)
+      expect(StrictLazy.violation).to eq(:raise)
+    end
+
+    it "restores the previous policy even when the block raises" do
+      expect do
+        StrictLazy.with_violation(:ignore) { raise "boom" }
+      end.to raise_error("boom")
+      expect(StrictLazy.violation).to eq(:raise)
+    end
+
+    it "nests: an inner override shadows the outer and unwinds cleanly" do
+      StrictLazy.with_violation(:ignore) do
+        StrictLazy.with_violation(:raise) do
+          expect(StrictLazy.violation).to eq(:raise)
+          expect { post.lazy.comments_count }.to raise_error(StrictLazy::UnloadedError)
+        end
+        expect(StrictLazy.violation).to eq(:ignore)
+      end
+    end
+
+    it "is independent of the baseline setter while active" do
+      StrictLazy.with_violation(:ignore) do
+        StrictLazy.violation = :log # changes the baseline only
+        expect(StrictLazy.violation).to eq(:ignore) # override still wins
+      end
+      expect(StrictLazy.violation).to eq(:log)
+    end
+
+    it "raises ArgumentError for an invalid mode without touching the stack" do
+      expect { StrictLazy.with_violation(:bogus) { :unreached } }.to raise_error(ArgumentError, /must be one of/)
+      expect(StrictLazy.violation).to eq(:raise)
+    end
+
+    it "does not leak the override to other threads" do
+      seen = nil
+      StrictLazy.with_violation(:ignore) do
+        Thread.new { seen = StrictLazy.violation }.join
+      end
+      expect(seen).to eq(:raise)
+    end
   end
 
   describe "request boundary" do
