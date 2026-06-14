@@ -21,8 +21,13 @@ module StrictLazy
       @default = default
       @from = from
       @block = block
-      @value_ivar = :"@_lazy_#{reader}"
-      @batch_ivar = :"@_batch_#{reader}"
+      # The ivar name may not contain `?`, so a predicate reader is encoded
+      # (not stripped): +commented?+ and +commented+ get distinct ivars. (A bare
+      # reader literally named +commented_pred+ would collide, but reader names
+      # are validated to a bare-name/`?` form, making that pairing a non-idiom.)
+      ivar_key = reader.to_s.sub(/\?\z/, "_pred")
+      @value_ivar = :"@_lazy_#{ivar_key}"
+      @batch_ivar = :"@_batch_#{ivar_key}"
     end
 
     def sync? = @sync

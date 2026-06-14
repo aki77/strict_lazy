@@ -182,6 +182,62 @@ RSpec.describe StrictLazy do
     end
   end
 
+  describe "predicate (?) reader names" do
+    it "resolves a `?` reader and returns its value" do
+      posts = make_posts(2, with_comments: { 0 => 1 })
+      StrictLazy.preload(posts, :commented?)
+      expect(posts[0].lazy.commented?).to be(true)
+    end
+
+    it "writes the default for unfulfilled records" do
+      posts = make_posts(2, with_comments: { 0 => 1 })
+      StrictLazy.preload(posts, :commented?)
+      expect(posts[1].lazy.commented?).to be(false)
+    end
+
+    it "does not collide with a same-named non-predicate reader" do
+      posts = make_posts(1, with_comments: { 0 => 1 })
+      StrictLazy.preload(posts, :commented?)
+      StrictLazy.preload(posts, :commented)
+      expect(posts.first.lazy.commented?).to be(true)
+      expect(posts.first.lazy.commented).to eq(:plain)
+    end
+
+    it "preloads by predicate reader symbol without KeyError" do
+      posts = make_posts(1, with_comments: { 0 => 1 })
+      expect { StrictLazy.preload(posts, :commented?) }.not_to raise_error
+      expect(posts.first.lazy.commented?).to be(true)
+    end
+
+    it "raises UnloadedError when read without preload" do
+      post = make_posts(1).first
+      expect { post.lazy.commented? }.to raise_error(StrictLazy::UnloadedError, /Post#commented\?/)
+    end
+
+    it "reflects the predicate reader in respond_to?" do
+      post = make_posts(1).first
+      expect(post.lazy).to respond_to(:commented?)
+      expect(post.lazy).not_to respond_to(:nonexistent?)
+    end
+  end
+
+  describe "invalid reader names" do
+    def declare(reader)
+      Class.new(ActiveRecord::Base) do
+        self.table_name = "posts"
+        include StrictLazy
+
+        lazy_load(reader) { |*| }
+      end
+    end
+
+    it "rejects setter (=), bang (!), and operator readers at declaration time" do
+      expect { declare(:foo=) }.to raise_error(ArgumentError, /read-only/)
+      expect { declare(:foo!) }.to raise_error(ArgumentError, /read-only/)
+      expect { declare(:[]) }.to raise_error(ArgumentError, /bare name/)
+    end
+  end
+
   describe "callable default" do
     it "produces a fresh instance per record for arity 0 (no shared mutable)" do
       posts = make_posts(2)

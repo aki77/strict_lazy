@@ -55,6 +55,17 @@ class Post < ActiveRecord::Base
   lazy_load :slug, default: ->(post) { "post-#{post.id}" } do |posts, loader|
     # Fulfills nothing.
   end
+
+  # Predicate (`?`) reader: like comments_count but returns a boolean.
+  lazy_load :commented?, default: false do |posts, loader|
+    ids = Comment.where(post_id: posts.map(&:id)).distinct.pluck(:post_id).to_set
+    posts.each { |p| loader.call(p, ids.include?(p.id)) }
+  end
+
+  # Same base name without `?`, to prove the predicate ivar does not collide.
+  lazy_load :commented, default: :none do |posts, loader|
+    posts.each { |p| loader.call(p, :plain) }
+  end
 end
 
 # STI subclass to prove lazy_loaders is inherited.

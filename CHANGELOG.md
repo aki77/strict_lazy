@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-14
+
+### Added
+
+- Support predicate reader names (`lazy_load :published?`), read via
+  `record.lazy.published?`. A reader must be a bare name or a `?` predicate; the
+  read-only `.lazy` namespace rejects setter (`=`), bang (`!`), and operator
+  reader names at declaration time.
+
 ## [0.1.0] - 2026-06-07
 
 ### Added
@@ -19,5 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   defaulting to `:raise` in development/test and `:ignore` in production through a Railtie.
 - Per-record callable `default:` for unfulfilled records.
 
-[Unreleased]: https://github.com/aki77/strict_lazy/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/aki77/strict_lazy/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/aki77/strict_lazy/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aki77/strict_lazy/releases/tag/v0.1.0

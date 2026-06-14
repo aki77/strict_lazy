@@ -21,6 +21,11 @@ module StrictLazy
   # :raise (dev/test default), :log, or :ignore. Set via StrictLazy.violation=.
   mattr_accessor :violation, default: :raise
 
+  # A valid reader is a bare name, optionally a `?` predicate. Setter (`=`),
+  # bang (`!`), and operator readers are rejected: the `.lazy` namespace is
+  # read-only, and any other form has no valid ivar to back it.
+  READER_FORMAT = /\A[A-Za-z_][A-Za-z0-9_]*\??\z/
+
   included do
     # Inherited by STI subclasses; merged (not mutated) on each declaration.
     class_attribute :lazy_loaders, instance_writer: false, default: {}
@@ -40,15 +45,30 @@ module StrictLazy
     # +default+ is written for records the resolver does not fulfill; pass a
     # callable for per-record (e.g. mutable) defaults.
     def lazy_load(reader, from: nil, sync: false, default: nil, &block)
-      raise ArgumentError, "lazy_load #{reader.inspect}: pass either `from:` or a block, not both" if from && block
-      raise ArgumentError, "lazy_load #{reader.inspect}: pass either `from:` or a block" unless from || block
-      if from && !respond_to?(from)
-        raise ArgumentError, "lazy_load #{reader.inspect}: `from: #{from.inspect}` is not defined on #{name}. " \
-                             "Define the class method before the lazy_load declaration."
-      end
+      validate_lazy_load!(reader, from, block)
 
       loader = Loader.new(reader: reader, sync: sync, default: default, from: from, block: block)
       self.lazy_loaders = lazy_loaders.merge(reader => loader)
+    end
+
+    private
+
+    def validate_lazy_load!(reader, from, block)
+      raise ArgumentError, "lazy_load #{reader.inspect}: pass either `from:` or a block, not both" if from && block
+      raise ArgumentError, "lazy_load #{reader.inspect}: pass either `from:` or a block" unless from || block
+      unless READER_FORMAT.match?(reader.to_s)
+        raise ArgumentError, "lazy_load #{reader.inspect}: reader must be a bare name or a `?` predicate; " \
+                             "the `.lazy` namespace is read-only (no setters, bang, or operator readers)"
+      end
+
+      validate_from_defined!(reader, from)
+    end
+
+    def validate_from_defined!(reader, from)
+      return if from.nil? || respond_to?(from)
+
+      raise ArgumentError, "lazy_load #{reader.inspect}: `from: #{from.inspect}` is not defined on #{name}. " \
+                           "Define the class method before the lazy_load declaration."
     end
   end
 

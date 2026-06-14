@@ -121,6 +121,11 @@ A static value (`default: 0`) is written as-is.
   the `lazy_load` declaration. Block resolvers have no such constraint.
 - Values live on the record (`@_lazy_<reader>`) and are GC'd with the request —
   no thread-local cache, no middleware.
+- **Predicate readers.** `lazy_load :published?` is supported and read as
+  `record.lazy.published?`; the `?` is encoded in the ivar (`@_lazy_published_pred`)
+  so it does not collide with a plain `published` reader. A reader must be a bare
+  name or a `?` predicate — the read-only `.lazy` namespace rejects setter (`=`),
+  bang (`!`), and operator reader names at declaration time.
 
 ## Non-Rails usage
 
