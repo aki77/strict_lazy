@@ -82,12 +82,23 @@ Passing a mutable value directly like `default: []` shares the same object acros
 StrictLazy.preload(records, *readers)
 ```
 
-- `records` — array of records (single records are wrapped with `Array()`). Does nothing if empty.
+- `records` — array of records (single records are wrapped with `Array()`). An `ActiveRecord::Relation` can also be passed directly — the internal `Array()` evaluates it (no `.to_a` needed). Does nothing if empty.
 - When `readers` is omitted, **all declared loaders** are prepared. Specify to prepare only a subset.
 - Creates a `Batch` for each loader and sets it on `@_batch_<reader>` for all records. Loaders with `sync: true` are immediately `resolve!`'d here.
 - The model is determined from `records.first.class`. Assumes a **group of records of the same model**.
 
 Note: **preloading the same loader for overlapping groups twice** causes the resolver to run multiple times. Call it once to cover the collection you read in the view.
+
+### Why passing a `Relation` directly works
+
+`preload` writes the `@_batch_<reader>` ivar onto each record object, so the records you preload and the records you read in the view must be the **same objects**. A `Relation` satisfies this:
+
+1. `Array(relation)` triggers `relation.to_a`, which loads the relation and **caches the result** (`relation.loaded? == true`).
+2. Re-iterating the same loaded `Relation` (e.g. `@posts.each` in the view) returns the **same cached objects** — not a re-query, not new instances.
+
+So `@posts = Post.recent; StrictLazy.preload(@posts)` then `@posts.each` in the view reads the very objects that got the batch ivar. The `Array()` call inside `preload` warms the relation's cache as a side effect, so no explicit `.to_a` is needed.
+
+The one caveat (same as the "match the collection" rule above): evaluating a **different** relation in the view — e.g. preloading `Post.recent` but iterating `Post.recent` again as a fresh query — produces new objects without the batch ivar, which then raise under `violation: :raise`. Keep the preloaded relation in a variable and reuse it.
 
 ## Read order of `record.lazy`
 
@@ -154,7 +165,7 @@ end
 ```ruby
 # app/controllers/posts_controller.rb
 def index
-  @posts = Post.recent.to_a
+  @posts = Post.recent         # an ActiveRecord::Relation is fine (no .to_a needed)
   StrictLazy.preload(@posts)   # prepares comments_count and avatar
 end
 ```

@@ -53,7 +53,7 @@ end
 ### 2. コントローラでプリロード
 
 ```ruby
-@posts = Post.recent.to_a
+@posts = Post.recent                   # ActiveRecord::Relation のままでよい（.to_a 不要）
 StrictLazy.preload(@posts)             # 全ローダー。preload(@posts, :avatar) で一部のみ
 ```
 

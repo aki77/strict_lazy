@@ -53,7 +53,7 @@ Records not called with `loader.call` receive the `default:` value (how Posts wi
 ### 2. Preload in the controller
 
 ```ruby
-@posts = Post.recent.to_a
+@posts = Post.recent                   # an ActiveRecord::Relation is fine (no .to_a needed)
 StrictLazy.preload(@posts)             # all loaders. preload(@posts, :avatar) for a subset
 ```
 
