@@ -173,6 +173,18 @@ A static value (`default: 0`) is written as-is.
   name or a `?` predicate — the read-only `.lazy` namespace rejects setter (`=`),
   bang (`!`), and operator reader names at declaration time.
 
+## Agent skill
+
+This repo ships an [agent skill](skills/strict-lazy/) (`SKILL.md`, plus a
+Japanese `SKILL-ja.md`) that teaches coding agents when and how to apply
+`strict_lazy`. Install it into your project with the GitHub CLI:
+
+```sh
+gh skill install aki77/strict_lazy
+```
+
+> `gh skill` is currently a GitHub CLI preview feature.
+
 ## Non-Rails usage
 
 Works without Rails: `include StrictLazy`, declare with `lazy_load`, call
