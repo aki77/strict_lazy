@@ -79,15 +79,26 @@ Passing a mutable value directly like `default: []` shares the same object acros
 ## `StrictLazy.preload`
 
 ```ruby
-StrictLazy.preload(records, *readers)
+StrictLazy.preload(records, *spec)
 ```
 
 - `records` — array of records (single records are wrapped with `Array()`). An `ActiveRecord::Relation` can also be passed directly — the internal `Array()` evaluates it (no `.to_a` needed). Does nothing if empty.
-- When `readers` is omitted, **all declared loaders** are prepared. Specify to prepare only a subset.
+- `spec` — a Rails-style list (mirrors ActiveRecord's `preload`). Each element is either:
+  - a **reader name** (Symbol) — prepared on `records`, or
+  - a **Hash** — keys are associations to traverse, values are the spec applied to the associated records (recursively). A Hash value may be a Symbol, a Hash, or an array mixing both.
+- When `spec` is **entirely empty**, **all declared loaders** on `records` are prepared. A Hash-only spec (e.g. `preload(posts, comments: :reply_count)`) prepares **nothing** on `records` itself — only the children.
 - Creates a `Batch` for each loader and sets it on `@_batch_<reader>` for all records. Loaders with `sync: true` are immediately `resolve!`'d here.
-- The model is determined from `records.first.class`. Assumes a **group of records of the same model**.
+- Records are grouped by **STI base class** (`class.base_class`), so each loader's resolver runs once per declaring class. A mixed-class array (STI subtrees, or children gathered across associations) is handled correctly.
+- Associations are batch-loaded via `ActiveRecord::Associations::Preloader` to avoid N+1 while traversing. Non-AR records skip this (preload the association yourself first). Traversing a name that isn't an association raises `ArgumentError`.
+
+```ruby
+# reader on posts + reader on comments + reader on comments.replies
+StrictLazy.preload(@posts, :comments_count, comments: [:reply_count, { replies: :shout }])
+```
 
 Note: **preloading the same loader for overlapping groups twice** causes the resolver to run multiple times. Call it once to cover the collection you read in the view.
+
+Out of scope: chaining a lazy reader's result into another lazy preload (lazy→lazy). `preload` traverses **associations** only. If a `lazy_load` returns records you want to preload further, collect them yourself and call `preload` again.
 
 ### Why passing a `Relation` directly works
 

@@ -4,12 +4,14 @@ require "active_support"
 require "active_support/concern"
 require "active_support/core_ext/class/attribute"
 require "active_support/core_ext/module/attribute_accessors_per_thread"
+require "active_support/core_ext/array/wrap"
 
 require_relative "strict_lazy/version"
 require_relative "strict_lazy/errors"
 require_relative "strict_lazy/loader"
 require_relative "strict_lazy/batch"
 require_relative "strict_lazy/facade"
+require_relative "strict_lazy/preloader"
 
 # strict_lazy applies the spirit of Rails' +strict_loading+ to computed values.
 # Include it in a model, declare values with +lazy_load+, prepare them in the
@@ -130,27 +132,29 @@ module StrictLazy
   end
   private_class_method :validate_violation!
 
-  # Prepare lazy values for a group of records. With no readers, prepares every
-  # declared loader. +sync: true+ loaders resolve immediately; others on first read.
-  def self.preload(records, *readers)
-    records = Array(records)
-    return records if records.empty?
-
-    model = records.first.class
-    loaders_for(model, readers).each do |loader|
-      batch = Batch.new(model, records, loader)
-      records.each { |record| record.instance_variable_set(loader.batch_ivar, batch) }
-      batch.resolve! if loader.sync?
-    end
-
-    records
+  # Prepare lazy values for a group of records.
+  #
+  # The +spec+ is a Rails-style list (mirroring ActiveRecord's +preload+): each
+  # element is either a reader name (Symbol) prepared on the given records, or a
+  # Hash whose keys are associations to traverse and whose values are the spec to
+  # apply recursively to the associated records. A Hash value may itself be a
+  # Symbol, a Hash, or an array mixing both — so a single level can prepare its
+  # own readers and descend into nested associations at once:
+  #
+  #   StrictLazy.preload(posts,
+  #     :comments_count,                              # reader on posts
+  #     comments: [:score, { replies: :like_count }] # reader on comments + nested
+  #   )
+  #
+  # With no spec at all, every declared loader on the records is prepared.
+  # +sync: true+ loaders resolve immediately; others on first read.
+  #
+  # Records may mix classes (e.g. STI subtrees, or children gathered across
+  # associations): they are grouped by their STI base class so each loader's
+  # resolver runs once per declaring class.
+  def self.preload(records, *spec)
+    Preloader.call(records, spec)
   end
-
-  def self.loaders_for(model, readers)
-    all = model.lazy_loaders
-    readers.empty? ? all.values : readers.map { |r| all.fetch(r) }
-  end
-  private_class_method :loaders_for
 end
 
 require_relative "strict_lazy/railtie" if defined?(Rails::Railtie)

@@ -73,6 +73,32 @@ StrictLazy.preload(@posts)            # all declared loaders
 <img src="<%= post.lazy.avatar %>">
 ```
 
+## Nested preload
+
+To prepare lazy values on associated records, pass a Hash to `preload`. The keys
+are associations to traverse; the values are the spec to apply to the associated
+records (a reader, a Hash, or an array mixing both — the same grammar as the
+top level). This mirrors ActiveRecord's `preload` spec.
+
+```ruby
+# comments and replies each declare their own lazy_load readers
+StrictLazy.preload(@posts,
+  :comments_count,                              # reader on @posts
+  comments: [:reply_count, { replies: :shout }] # reader on comments + nested
+)
+```
+
+- Plain symbols apply to the current level; Hash keys descend into associations.
+- A Hash-only call (`StrictLazy.preload(@posts, comments: :reply_count)`)
+  prepares nothing on `@posts` itself — only the children.
+- Associations are batch-loaded to avoid N+1. If the records aren't
+  ActiveRecord-backed (e.g. unsaved), preload the association yourself first.
+- Records may mix classes (STI subtrees, children gathered across associations);
+  they are grouped by STI base class so each resolver runs once per class.
+- This traverses **associations** only. Chaining a lazy reader into another lazy
+  preload (lazy→lazy) is out of scope — collect those records yourself and call
+  `preload` again.
+
 ## Eager vs lazy (`sync:`)
 
 - `sync: false` (default): resolution is deferred to the first `.lazy` read, then

@@ -25,6 +25,7 @@ RSpec.configure do |config|
 
   # Clean data between examples; the in-memory schema persists.
   config.after do
+    Reply.delete_all
     Comment.delete_all
     Post.delete_all
     Author.delete_all

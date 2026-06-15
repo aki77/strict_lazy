@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Nested preload: `StrictLazy.preload` now accepts a Rails-style spec, so lazy
+  values on associated records can be prepared in one call —
+  `StrictLazy.preload(posts, :comments_count, comments: [:reply_count, { replies: :shout }])`.
+  Associations are batch-loaded to avoid N+1; nesting is arbitrarily deep.
+
+### Changed
+
+- `StrictLazy.preload` groups records by STI base class, so a mixed-class array
+  (STI subtrees, or children gathered across associations) resolves each loader
+  once per declaring class. Single-model calls are unchanged.
+
 ## [0.3.0] - 2026-06-14
 
 ### Added

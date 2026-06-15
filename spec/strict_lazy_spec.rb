@@ -316,4 +316,102 @@ RSpec.describe StrictLazy do
       expect(posts.map { |p| p.lazy.slug }).to eq(posts.map { |p| "post-#{p.id}" })
     end
   end
+
+  describe "nested preload" do
+    # Build posts -> comments -> replies with given fan-out counts. Each test
+    # names only the levels it exercises; the rest default to none.
+    def make_tree(post_count:, comments_per_post: 0, replies_per_comment: 0)
+      posts = Array.new(post_count) { |i| Post.create!(author: author, title: "t#{i}") }
+      posts.each do |post|
+        comments_per_post.times do
+          comment = Comment.create!(post: post, body: "c")
+          replies_per_comment.times { Reply.create!(comment: comment, body: "r") }
+        end
+      end
+      posts
+    end
+
+    it "preloads a reader on the parent and on the nested association" do
+      posts = make_tree(post_count: 2, comments_per_post: 2)
+      comments = posts.flat_map(&:comments)
+
+      StrictLazy.preload(posts, :comments_count, comments: :reply_count)
+
+      expect(posts.map { |p| p.lazy.comments_count }).to eq([2, 2])
+      # reply_count resolves for the whole comment group in one query, no N+1.
+      expect(count_queries { comments.each { |c| c.lazy.reply_count } }).to eq(1)
+      expect(comments.map { |c| c.lazy.reply_count }).to all(eq(0))
+    end
+
+    it "prepares a parent reader and a deeper association at the same level" do
+      posts = make_tree(post_count: 1, comments_per_post: 2, replies_per_comment: 3)
+      comments = posts.flat_map(&:comments)
+      replies = comments.flat_map(&:replies)
+
+      StrictLazy.preload(posts, comments: [:reply_count, { replies: :shout }])
+
+      expect(comments.map { |c| c.lazy.reply_count }).to all(eq(3))
+      expect(replies.map { |r| r.lazy.shout }).to all(eq("R"))
+    end
+
+    it "descends multiple association levels" do
+      posts = make_tree(post_count: 2, comments_per_post: 1, replies_per_comment: 2)
+      replies = posts.flat_map(&:comments).flat_map(&:replies)
+
+      StrictLazy.preload(posts, comments: { replies: :shout })
+
+      expect(count_queries { replies.each { |r| r.lazy.shout } }).to eq(0)
+      expect(replies.map { |r| r.lazy.shout }).to all(eq("R"))
+    end
+
+    it "traverses associations without N+1" do
+      posts = make_tree(post_count: 5, comments_per_post: 3)
+      # Reload so the comments association starts unloaded (no association cache).
+      posts = Post.where(id: posts.map(&:id)).to_a
+
+      # preload batch-loads the comments association in a single query (the
+      # reply_count resolver is deferred to first read since it is async).
+      expect(count_queries { StrictLazy.preload(posts, comments: :reply_count) }).to eq(1)
+      # First read resolves reply_count for the whole comment group in one query.
+      comments = posts.flat_map(&:comments)
+      expect(count_queries { comments.each { |c| c.lazy.reply_count } }).to eq(1)
+    end
+
+    it "does not prepare the parent's loaders when only a Hash is given" do
+      posts = make_tree(post_count: 2, comments_per_post: 1)
+
+      StrictLazy.preload(posts, comments: :reply_count)
+
+      # The parent (Post) gets no batch, so reading a Post reader still raises.
+      expect { posts.first.lazy.comments_count }.to raise_error(StrictLazy::UnloadedError)
+    end
+
+    it "raises ArgumentError for an unknown association" do
+      posts = make_tree(post_count: 1)
+
+      expect { StrictLazy.preload(posts, nonexistent: :x) }
+        .to raise_error(ArgumentError, /not an association/)
+    end
+
+    it "no-ops when the association yields no children" do
+      posts = make_tree(post_count: 2)
+
+      expect { StrictLazy.preload(posts, comments: :reply_count) }.not_to raise_error
+    end
+  end
+
+  describe "mixed-class preload (STI base grouping)" do
+    it "resolves loaders once per declaring base class for a mixed array" do
+      plain = Post.create!(author: author, title: "p")
+      special = SpecialPost.create!(author: author, title: "s")
+      Comment.create!(post: plain, body: "c")
+      Comment.create!(post: special, body: "c")
+      Comment.create!(post: special, body: "c")
+
+      StrictLazy.preload([plain, special], :comments_count)
+
+      expect(plain.lazy.comments_count).to eq(1)
+      expect(special.lazy.comments_count).to eq(2)
+    end
+  end
 end

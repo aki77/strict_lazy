@@ -21,4 +21,9 @@ ActiveRecord::Schema.define do
     t.integer :post_id
     t.string :body
   end
+
+  create_table :replies, force: true do |t|
+    t.integer :comment_id
+    t.string :body
+  end
 end

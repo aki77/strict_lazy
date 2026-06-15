@@ -21,7 +21,30 @@ class Author < ActiveRecord::Base
 end
 
 class Comment < ActiveRecord::Base
+  include StrictLazy
+
   belongs_to :post
+  has_many :replies
+
+  # Block resolver over the whole comment group, to prove nested preload
+  # resolves children in a single grouped query.
+  lazy_load :reply_count, default: 0 do |comments, loader|
+    by_id = comments.index_by(&:id)
+    Reply.where(comment_id: by_id.keys).group(:comment_id).count.each do |comment_id, n|
+      loader.call(by_id[comment_id], n)
+    end
+  end
+end
+
+class Reply < ActiveRecord::Base
+  include StrictLazy
+
+  belongs_to :comment
+
+  # A trivial lazy value to exercise a third nesting level.
+  lazy_load :shout, default: "" do |replies, loader|
+    replies.each { |reply| loader.call(reply, reply.body.to_s.upcase) }
+  end
 end
 
 class Post < ActiveRecord::Base
