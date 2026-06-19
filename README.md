@@ -211,6 +211,10 @@ gh skill install aki77/strict_lazy
 
 > `gh skill` is currently a GitHub CLI preview feature.
 
+Alternatively, if your project already pulls `strict_lazy` in via Bundler, the
+[bundler-skills](https://github.com/aki77/bundler-skills) plugin auto-syncs this
+skill on `bundle install` — keeping the skill version locked to the gem version.
+
 ## Non-Rails usage
 
 Works without Rails: `include StrictLazy`, declare with `lazy_load`, call
