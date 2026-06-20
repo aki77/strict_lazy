@@ -201,9 +201,9 @@ A static value (`default: 0`) is written as-is.
 
 ## Agent skill
 
-This repo ships an [agent skill](skills/strict-lazy/) (`SKILL.md`, plus a
-Japanese `SKILL-ja.md`) that teaches coding agents when and how to apply
-`strict_lazy`. Install it into your project with the GitHub CLI:
+This repo ships an [agent skill](skills/strict-lazy/) (`SKILL.md`) that teaches
+coding agents when and how to apply `strict_lazy`. Install it into your project
+with the GitHub CLI:
 
 ```sh
 gh skill install aki77/strict_lazy
